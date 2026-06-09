@@ -1,0 +1,1 @@
+export { ResultadosPage } from './ResultadosPage'

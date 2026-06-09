@@ -1,0 +1,1 @@
+export { MateriasPage } from './MateriasPage'

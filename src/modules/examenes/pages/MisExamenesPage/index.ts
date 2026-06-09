@@ -1,0 +1,1 @@
+export { MisExamenesPage } from './MisExamenesPage'

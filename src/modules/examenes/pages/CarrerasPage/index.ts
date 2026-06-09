@@ -1,0 +1,1 @@
+export { CarrerasPage } from './CarrerasPage'

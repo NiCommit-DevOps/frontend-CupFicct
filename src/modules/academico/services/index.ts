@@ -1,0 +1,5 @@
+export { aulasService } from './aulas.service'
+export { docentesService, type ListarDocentesParams } from './docentes.service'
+export { materiasService } from './materias.service'
+export { horariosService } from './horarios.service'
+export { gruposService } from './grupos.service'

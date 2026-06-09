@@ -1,0 +1,1 @@
+export { ConvocatoriasPage } from './ConvocatoriasPage'

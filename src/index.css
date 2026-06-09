@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+/* Dark mode basado en la clase .dark en <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Tipografía */
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Azul institucional UAGRM */
+  --color-brand-50: #e8f0fb;
+  --color-brand-100: #d1e0f8;
+  --color-brand-200: #a9c8f2;
+  --color-brand-300: #79abeb;
+  --color-brand-400: #4d8dde;
+  --color-brand-500: #0b4ea7;
+  --color-brand-600: #083f87;
+  --color-brand-700: #062f67;
+  --color-brand-800: #04244f;
+  --color-brand-900: #021b35;
+  --color-brand-950: #010f21;
+
+  /* Rojo institucional / de acento */
+  --color-accent-50: #fff0f1;
+  --color-accent-100: #ffe0e1;
+  --color-accent-200: #ffc2c3;
+  --color-accent-300: #ff9798;
+  --color-accent-400: #ff6a6b;
+  --color-accent-500: #d72626;
+  --color-accent-600: #b71c1c;
+  --color-accent-700: #8f1314;
+  --color-accent-800: #6b0f10;
+  --color-accent-900: #4a0a0b;
+  --color-accent-950: #2f0708;
+
+  /* Fondos claros / oscuros */
+  --color-panel-bgLight: #ffffff;
+  --color-panel-bgDark: #000000;
+
+  /* Superficies */
+  --color-panel-light: #ffffff;
+  --color-panel-dark: #070707;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: #ffffff;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: #000000;
+  color: #f8fafc;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-brand-500) 30%, white);
+  color: #ffffff;
+}

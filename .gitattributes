@@ -1,0 +1,4 @@
+# Fin de línea LF para archivos que corren en Linux (Docker/Railway).
+*.template   text eol=lf
+Dockerfile   text eol=lf
+docker/**    text eol=lf

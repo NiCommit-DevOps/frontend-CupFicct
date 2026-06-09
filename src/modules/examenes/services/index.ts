@@ -1,0 +1,6 @@
+export { carrerasService } from './carreras.service'
+export { examenAlumnoService } from './examenAlumno.service'
+export { resultadosService } from './resultados.service'
+export { corteService } from './corte.service'
+export { historialService } from './historial.service'
+export { reportesService } from './reportes.service'

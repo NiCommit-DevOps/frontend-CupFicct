@@ -1,0 +1,1 @@
+export { PostulacionPage } from './PostulacionPage'
