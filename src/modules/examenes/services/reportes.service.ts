@@ -82,4 +82,25 @@ export const reportesService = {
     const res = await apiClient.get('/reportes/comparativa-gestiones/csv', { responseType: 'blob' })
     descargarBlob(res.data as Blob, 'comparativa_gestiones.csv')
   },
+
+  async descargarListaCsv(idConvocatoria: number, filtro: FiltroLista): Promise<void> {
+    const res = await apiClient.get('/reportes/lista/csv', {
+      params: { id_convocatoria: idConvocatoria, filtro },
+      responseType: 'blob',
+    })
+    descargarBlob(res.data as Blob, 'lista_postulantes.csv')
+  },
+
+  async descargarEstadisticasCsv(idConvocatoria: number): Promise<void> {
+    const res = await apiClient.get('/reportes/estadisticas/csv', {
+      params: { id_convocatoria: idConvocatoria },
+      responseType: 'blob',
+    })
+    descargarBlob(res.data as Blob, 'estadisticas.csv')
+  },
+
+  async descargarDocentesCsv(): Promise<void> {
+    const res = await apiClient.get('/reportes/docentes-grupos/csv', { responseType: 'blob' })
+    descargarBlob(res.data as Blob, 'docentes_ranking.csv')
+  },
 }

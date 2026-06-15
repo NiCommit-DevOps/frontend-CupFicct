@@ -63,6 +63,16 @@ export function ReportesPage() {
     }
   }
 
+  // CSV del reporte de la pestaña actual que depende de una convocatoria.
+  const descargarCsvConvocatoria = () => {
+    const id = filtro.id_convocatoria as number
+    if (tab === 'acta') return reportesService.descargarActaCsv(id)
+    if (tab === 'padron') return reportesService.descargarPadronCsv(id)
+    if (tab === 'lista') return reportesService.descargarListaCsv(id, filtroLista)
+    if (tab === 'estadisticas') return reportesService.descargarEstadisticasCsv(id)
+    return Promise.resolve()
+  }
+
   return (
     <div className="flex flex-col">
       <PageHeader
@@ -102,21 +112,13 @@ export function ReportesPage() {
             </div>
             {filtro.id_convocatoria != null && (
               <div className="flex gap-2">
-                {(tab === 'acta' || tab === 'padron') && (
-                  <Button
-                    variant="secondary"
-                    loading={descargando}
-                    onClick={() =>
-                      descargarCsv(() =>
-                        tab === 'acta'
-                          ? reportesService.descargarActaCsv(filtro.id_convocatoria!)
-                          : reportesService.descargarPadronCsv(filtro.id_convocatoria!),
-                      )
-                    }
-                  >
-                    Descargar CSV
-                  </Button>
-                )}
+                <Button
+                  variant="secondary"
+                  loading={descargando}
+                  onClick={() => descargarCsv(descargarCsvConvocatoria)}
+                >
+                  Descargar CSV
+                </Button>
                 <Button
                   onClick={() => {
                     if (tab === 'acta' && actaQuery.data) imprimirActa(actaQuery.data)
@@ -137,9 +139,18 @@ export function ReportesPage() {
             <p className="text-sm text-slate-500 dark:text-slate-300">
               Docentes por grupo (con % de aprobados) y ranking del docente con mayor aprobación.
             </p>
-            <Button onClick={() => docentesQuery.data && imprimirDocentes(docentesQuery.data)}>
-              Imprimir / PDF
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                loading={descargando}
+                onClick={() => descargarCsv(() => reportesService.descargarDocentesCsv())}
+              >
+                Descargar CSV
+              </Button>
+              <Button onClick={() => docentesQuery.data && imprimirDocentes(docentesQuery.data)}>
+                Imprimir / PDF
+              </Button>
+            </div>
           </div>
         </Card>
       ) : tab === 'comparativa' ? (
