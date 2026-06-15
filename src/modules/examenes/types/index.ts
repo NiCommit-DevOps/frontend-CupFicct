@@ -158,6 +158,9 @@ export interface ActaAdmitido {
   nombres: string | null
   apellidos: string | null
   promedio_final: number | null
+  /** '1ª' | '2ª' | '—' según a qué preferencia entró por cupos. */
+  preferencia: string
+  preferencia_orden: number | null
 }
 
 export interface ActaGrupo {
@@ -169,6 +172,8 @@ export interface ActaData {
   convocatoria: string
   gestion: string | null
   total: number
+  /** Conteo de admitidos por preferencia. */
+  resumen: { primera: number; segunda: number; otra: number }
   por_carrera: ActaGrupo[]
 }
 
@@ -257,5 +262,35 @@ export interface DocenteGrupoFila {
   turno: string | null
   inscritos: number
   aprobados: number
+  porcentaje: number
   docentes: { id_docente: number; nombre: string; profesion: string | null }[]
+}
+
+/** Fila del ranking de docentes por % de aprobados (agregado de sus grupos). */
+export interface DocenteRankingFila {
+  id_docente: number
+  nombre: string
+  profesion: string | null
+  inscritos: number
+  aprobados: number
+  porcentaje: number
+  grupos: string
+}
+
+export interface DocentesReporte {
+  grupos: DocenteGrupoFila[]
+  ranking: DocenteRankingFila[]
+}
+
+/** Métricas de una gestión para la comparativa de rendimiento entre gestiones. */
+export interface ComparativaGestion {
+  id_gestion: number
+  gestion: string
+  total_inscritos: number
+  con_nota: number
+  aprobados: number
+  reprobados: number
+  admitidos: number
+  promedio_general: number
+  porcentaje_aprobacion: number
 }

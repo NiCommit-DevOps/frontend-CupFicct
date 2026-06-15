@@ -49,3 +49,11 @@ export function useDocentesPorGrupo(enabled: boolean) {
     enabled,
   })
 }
+
+export function useComparativaGestiones(enabled: boolean) {
+  return useQuery({
+    queryKey: ['reporte-comparativa-gestiones'],
+    queryFn: () => reportesService.comparativaGestiones(),
+    enabled,
+  })
+}

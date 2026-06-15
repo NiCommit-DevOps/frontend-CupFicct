@@ -3,7 +3,8 @@ import { descargarBlob } from '@/lib/imprimir'
 import type {
   ActaData,
   CertificadoFila,
-  DocenteGrupoFila,
+  ComparativaGestion,
+  DocentesReporte,
   EstadisticasData,
   FiltroLista,
   ListaData,
@@ -48,9 +49,15 @@ export const reportesService = {
     return data
   },
 
-  /** Docentes por grupo. */
-  async docentesPorGrupo(): Promise<DocenteGrupoFila[]> {
-    const { data } = await apiClient.get<{ data: DocenteGrupoFila[] }>('/reportes/docentes-grupos')
+  /** Docentes por grupo (con %) + ranking de docentes por % de aprobados. */
+  async docentesPorGrupo(): Promise<DocentesReporte> {
+    const { data } = await apiClient.get<{ data: DocentesReporte }>('/reportes/docentes-grupos')
+    return data.data
+  },
+
+  /** Rendimiento académico comparado entre gestiones. */
+  async comparativaGestiones(): Promise<ComparativaGestion[]> {
+    const { data } = await apiClient.get<{ data: ComparativaGestion[] }>('/reportes/comparativa-gestiones')
     return data.data
   },
 
@@ -69,5 +76,10 @@ export const reportesService = {
       responseType: 'blob',
     })
     descargarBlob(res.data as Blob, 'padron_academico.csv')
+  },
+
+  async descargarComparativaCsv(): Promise<void> {
+    const res = await apiClient.get('/reportes/comparativa-gestiones/csv', { responseType: 'blob' })
+    descargarBlob(res.data as Blob, 'comparativa_gestiones.csv')
   },
 }

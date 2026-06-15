@@ -13,18 +13,20 @@ import {
   useLista,
   useEstadisticas,
   useDocentesPorGrupo,
+  useComparativaGestiones,
 } from '../../hooks/useReportes'
 import type {
   ActaData,
   CertificadoFila,
-  DocenteGrupoFila,
+  ComparativaGestion,
+  DocentesReporte,
   EstadisticasData,
   FiltroLista,
   ListaData,
   PadronData,
 } from '../../types'
 
-type Tab = 'acta' | 'padron' | 'lista' | 'estadisticas' | 'docentes' | 'certificados'
+type Tab = 'acta' | 'padron' | 'lista' | 'estadisticas' | 'docentes' | 'comparativa' | 'certificados'
 
 const num = (v: number | null) => (v != null ? v.toFixed(2) : '—')
 
@@ -46,6 +48,7 @@ export function ReportesPage() {
   const listaQuery = useLista(tab === 'lista' ? filtro.id_convocatoria : null, filtroLista)
   const estadisticasQuery = useEstadisticas(tab === 'estadisticas' ? filtro.id_convocatoria : null)
   const docentesQuery = useDocentesPorGrupo(tab === 'docentes')
+  const comparativaQuery = useComparativaGestiones(tab === 'comparativa')
   const certQuery = useCertificados(terminoCert)
 
   // Pestañas que requieren seleccionar una convocatoria.
@@ -73,6 +76,7 @@ export function ReportesPage() {
         <button className={tabClass(tab === 'lista')} onClick={() => setTab('lista')}>Postulantes</button>
         <button className={tabClass(tab === 'estadisticas')} onClick={() => setTab('estadisticas')}>Estadísticas</button>
         <button className={tabClass(tab === 'docentes')} onClick={() => setTab('docentes')}>Docentes por grupo</button>
+        <button className={tabClass(tab === 'comparativa')} onClick={() => setTab('comparativa')}>Comparativa gestiones</button>
         <button className={tabClass(tab === 'certificados')} onClick={() => setTab('certificados')}>Certificados</button>
       </div>
 
@@ -131,11 +135,31 @@ export function ReportesPage() {
         <Card className="mb-6">
           <div className="flex items-center justify-between p-4">
             <p className="text-sm text-slate-500 dark:text-slate-300">
-              Docentes asignados a cada grupo, con su cupo ocupado y aprobados.
+              Docentes por grupo (con % de aprobados) y ranking del docente con mayor aprobación.
             </p>
             <Button onClick={() => docentesQuery.data && imprimirDocentes(docentesQuery.data)}>
               Imprimir / PDF
             </Button>
+          </div>
+        </Card>
+      ) : tab === 'comparativa' ? (
+        <Card className="mb-6">
+          <div className="flex items-center justify-between p-4">
+            <p className="text-sm text-slate-500 dark:text-slate-300">
+              Rendimiento académico comparado entre todas las gestiones.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                loading={descargando}
+                onClick={() => descargarCsv(() => reportesService.descargarComparativaCsv())}
+              >
+                Descargar CSV
+              </Button>
+              <Button onClick={() => comparativaQuery.data && imprimirComparativa(comparativaQuery.data)}>
+                Imprimir / PDF
+              </Button>
+            </div>
           </div>
         </Card>
       ) : (
@@ -167,6 +191,7 @@ export function ReportesPage() {
       {tab === 'lista' && <SeccionLista filtro={filtro} query={listaQuery} />}
       {tab === 'estadisticas' && <SeccionEstadisticas filtro={filtro} query={estadisticasQuery} />}
       {tab === 'docentes' && <SeccionDocentes query={docentesQuery} />}
+      {tab === 'comparativa' && <SeccionComparativa query={comparativaQuery} />}
       {tab === 'certificados' && <SeccionCertificados termino={terminoCert} query={certQuery} />}
     </div>
   )
@@ -353,35 +378,130 @@ function Kpi({ label, value }: { label: string; value: string }) {
 
 function SeccionDocentes({ query }: { query: ReturnType<typeof useDocentesPorGrupo> }) {
   if (query.isLoading || !query.data) return <LoadingState />
-  const grupos = query.data
+  const { grupos, ranking } = query.data
   if (grupos.length === 0) {
-    return <Card className="py-16 text-center text-sm text-slate-400">No hay grupos registrados.</Card>
+    return <Card className="py-16 text-center text-sm text-slate-400">No hay grupos registrados en la convocatoria activa.</Card>
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {grupos.map((g) => (
-        <Card key={g.id_grupo} className="p-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-brand-600 dark:text-brand-300">
-              {g.sigla} · {g.nombre} {g.turno ? `(${g.turno})` : ''}
-            </h3>
-            <p className="text-xs text-slate-400">{g.inscritos} inscrito(s) · {g.aprobados} aprobado(s)</p>
-          </div>
-          {g.docentes.length === 0 ? (
-            <p className="text-sm text-slate-400">Sin docentes asignados.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {g.docentes.map((d) => (
-                <Badge key={d.id_docente} tone="brand">
-                  {d.nombre}{d.profesion ? ` · ${d.profesion}` : ''}
-                </Badge>
+    <div className="flex flex-col gap-6">
+      {/* Ranking de docentes por % de aprobados (encabezado: el de mayor %). */}
+      <Card>
+        <div className="border-b border-slate-200/60 px-4 py-3 dark:border-slate-700/40">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Ranking de docentes por % de aprobados
+          </h2>
+        </div>
+        {ranking.length === 0 ? (
+          <p className="py-10 text-center text-sm text-slate-400">Aún no hay docentes con grupos.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200/60 text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700/40">
+                <th className="px-4 py-2.5 font-medium">#</th>
+                <th className="px-4 py-2.5 font-medium">Docente</th>
+                <th className="px-4 py-2.5 font-medium">Grupos</th>
+                <th className="px-4 py-2.5 text-center font-medium">Inscritos</th>
+                <th className="px-4 py-2.5 text-center font-medium">Aprobados</th>
+                <th className="px-4 py-2.5 text-right font-medium">% aprobados</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {ranking.map((d, i) => (
+                <tr key={d.id_docente} className={i === 0 ? 'bg-brand-50 dark:bg-brand-500/10' : ''}>
+                  <td className="px-4 py-2.5 text-slate-500">{i + 1}</td>
+                  <td className="px-4 py-2.5 text-slate-700 dark:text-slate-200">
+                    {i === 0 && <Badge tone="success">Mayor %</Badge>} {d.nombre}
+                    {d.profesion ? <span className="block text-xs text-slate-400">{d.profesion}</span> : null}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-500">{d.grupos || '—'}</td>
+                  <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{d.inscritos}</td>
+                  <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{d.aprobados}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-slate-800 dark:text-slate-100">{d.porcentaje.toFixed(1)}%</td>
+                </tr>
               ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      {/* Detalle por grupo. */}
+      <div className="flex flex-col gap-3">
+        {grupos.map((g) => (
+          <Card key={g.id_grupo} className="p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold text-brand-600 dark:text-brand-300">
+                {g.sigla} · {g.nombre} {g.turno ? `(${g.turno})` : ''}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {g.inscritos} inscrito(s) · {g.aprobados} aprobado(s) · {g.porcentaje.toFixed(1)}% aprobación
+              </p>
             </div>
-          )}
-        </Card>
-      ))}
+            {g.docentes.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin docentes asignados.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {g.docentes.map((d) => (
+                  <Badge key={d.id_docente} tone="brand">
+                    {d.nombre}{d.profesion ? ` · ${d.profesion}` : ''}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
     </div>
+  )
+}
+
+/* ----------------------- Comparativa entre gestiones --------------------- */
+
+function SeccionComparativa({ query }: { query: ReturnType<typeof useComparativaGestiones> }) {
+  if (query.isLoading || !query.data) return <LoadingState />
+  const gestiones = query.data
+  if (gestiones.length === 0) {
+    return <Card className="py-16 text-center text-sm text-slate-400">No hay gestiones registradas.</Card>
+  }
+
+  return (
+    <Card>
+      <div className="border-b border-slate-200/60 px-4 py-3 dark:border-slate-700/40">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Rendimiento académico entre gestiones
+        </h2>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200/60 text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700/40">
+              <th className="px-4 py-2.5 font-medium">Gestión</th>
+              <th className="px-4 py-2.5 text-center font-medium">Inscritos</th>
+              <th className="px-4 py-2.5 text-center font-medium">Con nota</th>
+              <th className="px-4 py-2.5 text-center font-medium">Aprobados</th>
+              <th className="px-4 py-2.5 text-center font-medium">Reprobados</th>
+              <th className="px-4 py-2.5 text-center font-medium">Admitidos</th>
+              <th className="px-4 py-2.5 text-center font-medium">Promedio</th>
+              <th className="px-4 py-2.5 text-right font-medium">% aprobación</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {gestiones.map((g) => (
+              <tr key={g.id_gestion}>
+                <td className="px-4 py-2.5 font-medium text-slate-700 dark:text-slate-200">{g.gestion}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.total_inscritos}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.con_nota}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.aprobados}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.reprobados}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.admitidos}</td>
+                <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-300">{g.promedio_general.toFixed(2)}</td>
+                <td className="px-4 py-2.5 text-right font-semibold text-slate-800 dark:text-slate-100">{g.porcentaje_aprobacion.toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   )
 }
 
@@ -400,6 +520,11 @@ function SeccionActa({ filtro, query }: { filtro: FiltroGestionConvocatoria; que
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
           {acta.convocatoria} · {acta.total} admitido(s)
         </h2>
+        <p className="mt-1 flex flex-wrap gap-2 text-xs">
+          <Badge tone="success">1ª preferencia: {acta.resumen.primera}</Badge>
+          <Badge tone="neutral">2ª preferencia: {acta.resumen.segunda}</Badge>
+          {acta.resumen.otra > 0 && <Badge tone="neutral">Otra: {acta.resumen.otra}</Badge>}
+        </p>
       </div>
       {acta.por_carrera.length === 0 ? (
         <p className="py-12 text-center text-sm text-slate-400">No hay admitidos en esta convocatoria.</p>
@@ -414,6 +539,7 @@ function SeccionActa({ filtro, query }: { filtro: FiltroGestionConvocatoria; que
                     <th className="py-1.5 pr-4 font-medium">Código</th>
                     <th className="py-1.5 pr-4 font-medium">CI</th>
                     <th className="py-1.5 pr-4 font-medium">Postulante</th>
+                    <th className="py-1.5 pr-4 text-center font-medium">Preferencia</th>
                     <th className="py-1.5 text-right font-medium">Promedio</th>
                   </tr>
                 </thead>
@@ -423,6 +549,9 @@ function SeccionActa({ filtro, query }: { filtro: FiltroGestionConvocatoria; que
                       <td className="py-1.5 pr-4 text-slate-500">{a.codigo_tramite}</td>
                       <td className="py-1.5 pr-4 text-slate-500">{a.ci}</td>
                       <td className="py-1.5 pr-4 text-slate-700 dark:text-slate-200">{a.nombres} {a.apellidos}</td>
+                      <td className="py-1.5 pr-4 text-center">
+                        <Badge tone={a.preferencia_orden === 1 ? 'success' : 'neutral'}>{a.preferencia}</Badge>
+                      </td>
                       <td className="py-1.5 text-right font-semibold text-slate-700 dark:text-slate-200">{num(a.promedio_final)}</td>
                     </tr>
                   ))}
@@ -530,11 +659,11 @@ function imprimirActa(acta: ActaData) {
   const cuerpo = acta.por_carrera
     .map(
       (g) => `<h2>${esc(g.carrera)}</h2>
-      <table><thead><tr><th>Código</th><th>CI</th><th>Apellidos</th><th>Nombres</th><th class="num">Promedio</th></tr></thead>
+      <table><thead><tr><th>Código</th><th>CI</th><th>Apellidos</th><th>Nombres</th><th>Preferencia</th><th class="num">Promedio</th></tr></thead>
       <tbody>${g.admitidos
         .map(
           (a) =>
-            `<tr><td>${esc(a.codigo_tramite)}</td><td>${esc(a.ci)}</td><td>${esc(a.apellidos)}</td><td>${esc(a.nombres)}</td><td class="num">${a.promedio_final != null ? a.promedio_final.toFixed(2) : ''}</td></tr>`,
+            `<tr><td>${esc(a.codigo_tramite)}</td><td>${esc(a.ci)}</td><td>${esc(a.apellidos)}</td><td>${esc(a.nombres)}</td><td>${esc(a.preferencia)}</td><td class="num">${a.promedio_final != null ? a.promedio_final.toFixed(2) : ''}</td></tr>`,
         )
         .join('')}</tbody></table>`,
     )
@@ -543,7 +672,7 @@ function imprimirActa(acta: ActaData) {
   imprimirDocumento(
     'Acta de Admitidos',
     `<h1>Acta Oficial de Admitidos</h1>
-     <p class="sub">${esc(acta.gestion ?? '')} · ${esc(acta.convocatoria)} · ${acta.total} admitido(s)</p>${cuerpo}`,
+     <p class="sub">${esc(acta.gestion ?? '')} · ${esc(acta.convocatoria)} · ${acta.total} admitido(s) · 1ª: ${acta.resumen.primera} · 2ª: ${acta.resumen.segunda}${acta.resumen.otra > 0 ? ` · Otra: ${acta.resumen.otra}` : ''}</p>${cuerpo}`,
   )
 }
 
@@ -620,11 +749,18 @@ function imprimirEstadisticas(e: EstadisticasData) {
   )
 }
 
-function imprimirDocentes(grupos: DocenteGrupoFila[]) {
-  const cuerpo = grupos
+function imprimirDocentes(rep: DocentesReporte) {
+  const ranking = rep.ranking
+    .map(
+      (d, i) =>
+        `<tr><td class="num">${i + 1}</td><td>${esc(d.nombre)}${d.profesion ? ` · ${esc(d.profesion)}` : ''}</td><td>${esc(d.grupos)}</td><td class="num">${d.inscritos}</td><td class="num">${d.aprobados}</td><td class="num">${d.porcentaje.toFixed(1)}%</td></tr>`,
+    )
+    .join('')
+
+  const grupos = rep.grupos
     .map(
       (g) =>
-        `<tr><td>${esc(g.sigla)} · ${esc(g.nombre)}</td><td>${esc(g.turno ?? '')}</td><td class="num">${g.inscritos}</td><td class="num">${g.aprobados}</td>
+        `<tr><td>${esc(g.sigla)} · ${esc(g.nombre)}</td><td>${esc(g.turno ?? '')}</td><td class="num">${g.inscritos}</td><td class="num">${g.aprobados}</td><td class="num">${g.porcentaje.toFixed(1)}%</td>
         <td>${g.docentes.length > 0 ? g.docentes.map((d) => esc(d.nombre)).join(', ') : '—'}</td></tr>`,
     )
     .join('')
@@ -632,8 +768,28 @@ function imprimirDocentes(grupos: DocenteGrupoFila[]) {
   imprimirDocumento(
     'Docentes por grupo',
     `<h1>Docentes por grupo</h1>
-     <table><thead><tr><th>Grupo</th><th>Turno</th><th class="num">Inscritos</th><th class="num">Aprobados</th><th>Docentes</th></tr></thead>
-     <tbody>${cuerpo}</tbody></table>`,
+     <h2>Ranking de docentes por % de aprobados</h2>
+     <table><thead><tr><th class="num">#</th><th>Docente</th><th>Grupos</th><th class="num">Inscritos</th><th class="num">Aprobados</th><th class="num">% aprobados</th></tr></thead>
+     <tbody>${ranking}</tbody></table>
+     <h2>Detalle por grupo</h2>
+     <table><thead><tr><th>Grupo</th><th>Turno</th><th class="num">Inscritos</th><th class="num">Aprobados</th><th class="num">%</th><th>Docentes</th></tr></thead>
+     <tbody>${grupos}</tbody></table>`,
+  )
+}
+
+function imprimirComparativa(gestiones: ComparativaGestion[]) {
+  const filas = gestiones
+    .map(
+      (g) =>
+        `<tr><td>${esc(g.gestion)}</td><td class="num">${g.total_inscritos}</td><td class="num">${g.con_nota}</td><td class="num">${g.aprobados}</td><td class="num">${g.reprobados}</td><td class="num">${g.admitidos}</td><td class="num">${g.promedio_general.toFixed(2)}</td><td class="num">${g.porcentaje_aprobacion.toFixed(1)}%</td></tr>`,
+    )
+    .join('')
+
+  imprimirDocumento(
+    'Comparativa entre gestiones',
+    `<h1>Rendimiento académico entre gestiones</h1>
+     <table><thead><tr><th>Gestión</th><th class="num">Inscritos</th><th class="num">Con nota</th><th class="num">Aprobados</th><th class="num">Reprobados</th><th class="num">Admitidos</th><th class="num">Promedio</th><th class="num">% aprobación</th></tr></thead>
+     <tbody>${filas}</tbody></table>`,
   )
 }
 
