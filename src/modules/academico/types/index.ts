@@ -93,11 +93,10 @@ export interface DocenteGrupo {
   turno: string | null
 }
 
-/** Una asignación del docente: una carrera con las materias (áreas) que dicta en ella. */
-export interface DocenteAsignacion {
-  id_carrera: number
-  carrera?: string | null
-  materias: { id_materia: number; nombre: string | null }[]
+/** Una carrera del docente (texto libre) con sus áreas (materias). */
+export interface DocenteCarreraArea {
+  carrera: string
+  areas: { id_materia: number; nombre: string | null }[]
 }
 
 export interface Docente {
@@ -108,18 +107,20 @@ export interface Docente {
   tiene_maestria: boolean
   tiene_diplomado: boolean
   usuario?: Usuario | null
-  /** Contratación agrupada por carrera (carrera + sus áreas/materias). */
-  asignaciones?: DocenteAsignacion[]
-  /** Lista plana de materias distintas (resumen para tabla). */
+  /** Carreras (texto libre) con sus áreas. La unión de áreas = lo que puede enseñar. */
+  carreras?: DocenteCarreraArea[]
+  /** Unión de áreas (materias que puede enseñar). */
+  areas?: { id_materia: number; nombre: string | null }[]
+  /** Materias que el docente desea/va a enseñar (⊆ unión de áreas). */
   materias?: Materia[]
   convocatorias?: DocenteConvocatoria[]
   grupos?: DocenteGrupo[]
 }
 
-/** Asignación enviada al backend (carrera + ids de materias). */
-export interface DocenteAsignacionPayload {
-  id_carrera: number
-  materias: number[]
+/** Carrera enviada al backend (texto + ids de áreas/materias). */
+export interface DocenteCarreraAreaPayload {
+  carrera: string
+  areas: number[]
 }
 
 /** Payload de creación: crea el Usuario base (rol Docente) + el perfil docente.
@@ -138,19 +139,21 @@ export interface DocenteCreatePayload {
   especialidad?: string | null
   tiene_maestria?: boolean
   tiene_diplomado?: boolean
-  asignaciones?: DocenteAsignacionPayload[]
+  carreras?: DocenteCarreraAreaPayload[]
+  materias?: number[]
   convocatorias?: number[]
   grupos?: number[]
 }
 
-/** Payload de actualización: solo perfil docente + asignaciones (datos personales vía CU02/CU18). */
+/** Payload de actualización: perfil docente + carreras/áreas + materias (datos personales vía CU02/CU18). */
 export interface DocenteUpdatePayload {
   profesion?: string | null
   carga_horaria?: number | null
   especialidad?: string | null
   tiene_maestria?: boolean
   tiene_diplomado?: boolean
-  asignaciones?: DocenteAsignacionPayload[]
+  carreras?: DocenteCarreraAreaPayload[]
+  materias?: number[]
   convocatorias?: number[]
   grupos?: number[]
 }

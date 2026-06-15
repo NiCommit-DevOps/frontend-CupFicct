@@ -1,6 +1,5 @@
 import { Badge, Card, DetailModal, LoadingState, PageHeader } from '@/shared/ui'
 import type { Materia, Docente, DocenteGrupo } from '@/modules/academico/types'
-import type { Carrera } from '@/modules/examenes/types'
 import type { Convocatoria } from '@/modules/administrativo/types'
 import type { FiltroGestionConvocatoria } from '@/modules/administrativo/components/GestionConvocatoriaFilter'
 import { DocentesToolbar } from './components/DocentesToolbar.view'
@@ -14,7 +13,6 @@ interface Props {
   docentes: Docente[]
   isLoading: boolean
   materias: Materia[]
-  carreras: Carrera[]
   convocatorias: Convocatoria[]
   grupos: DocenteGrupo[]
   buscar: string
@@ -84,7 +82,6 @@ export function DocentesPageView(props: Props) {
         loading={props.guardando}
         error={props.errorForm}
         materias={props.materias}
-        carreras={props.carreras}
         convocatorias={props.convocatorias}
         grupos={props.grupos}
         docente={props.editando}
@@ -130,24 +127,40 @@ export function DocentesPageView(props: Props) {
                     ),
                 },
                 {
-                  label: 'Carreras y áreas que dicta',
+                  label: 'Carreras y áreas (profesión)',
                   full: true,
                   value:
-                    props.viendo.asignaciones && props.viendo.asignaciones.length > 0 ? (
+                    props.viendo.carreras && props.viendo.carreras.length > 0 ? (
                       <div className="flex flex-col gap-2">
-                        {props.viendo.asignaciones.map((a) => (
-                          <div key={a.id_carrera} className="flex flex-col gap-1">
+                        {props.viendo.carreras.map((c) => (
+                          <div key={c.carrera} className="flex flex-col gap-1">
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-300">
-                              {a.carrera ?? `Carrera #${a.id_carrera}`}
+                              {c.carrera}
                             </span>
                             <div className="flex flex-wrap gap-1">
-                              {a.materias.map((m) => (
-                                <Badge key={m.id_materia} tone="brand">
+                              {c.areas.map((m) => (
+                                <Badge key={m.id_materia} tone="neutral">
                                   {m.nombre}
                                 </Badge>
                               ))}
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    ) : (
+                      ''
+                    ),
+                },
+                {
+                  label: 'Materias que enseña',
+                  full: true,
+                  value:
+                    props.viendo.materias && props.viendo.materias.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {props.viendo.materias.map((m) => (
+                          <Badge key={m.id_materia} tone="brand">
+                            {m.nombre}
+                          </Badge>
                         ))}
                       </div>
                     ) : (
