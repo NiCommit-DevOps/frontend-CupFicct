@@ -7,8 +7,10 @@ import {
   useActualizarDocente,
   useEliminarDocente,
 } from '../../hooks/useDocentes'
+import { useQuery } from '@tanstack/react-query'
 import { useMaterias } from '../../hooks/useMaterias'
 import { useGrupos } from '../../hooks/useGrupos'
+import { carrerasService } from '@/modules/examenes/services'
 import { useConvocatorias } from '@/modules/administrativo/hooks/useConvocatorias'
 import type { FiltroGestionConvocatoria } from '@/modules/administrativo/components/GestionConvocatoriaFilter'
 import type { Docente, DocenteCreatePayload, DocenteUpdatePayload } from '../../types'
@@ -46,6 +48,12 @@ export function DocentesPage() {
   })
   // El catálogo de materias solo se necesita cuando el usuario puede crear/editar.
   const materiasQuery = useMaterias(undefined, puedeCrear || puedeEditar)
+  // Carreras para el repetidor "Carrera + áreas" del formulario.
+  const carrerasQuery = useQuery({
+    queryKey: ['carreras'],
+    queryFn: () => carrerasService.listar(),
+    enabled: puedeCrear || puedeEditar,
+  })
   // Convocatorias para el multi-select del formulario (solo si puede crear/editar).
   const convocatoriasQuery = useConvocatorias(null)
   // Grupos disponibles para asignar al docente (de 1 a 4).
@@ -76,13 +84,18 @@ export function DocentesPage() {
   const cerrarVer = () => setViendo(null)
 
   const handleSubmit = (values: DocenteFormValues) => {
+    // Solo asignaciones válidas: carrera elegida y al menos un área (materia).
+    const asignaciones = values.asignaciones
+      .filter((a) => a.id_carrera > 0 && a.materias.length > 0)
+      .map((a) => ({ id_carrera: a.id_carrera, materias: a.materias }))
+
     const perfil = {
       profesion: values.profesion.trim() || null,
       carga_horaria: values.carga_horaria ? Number(values.carga_horaria) : null,
       especialidad: values.especialidad.trim() || null,
       tiene_maestria: values.tiene_maestria,
       tiene_diplomado: values.tiene_diplomado,
-      materias: values.materias,
+      asignaciones,
       convocatorias: values.convocatorias,
       grupos: values.grupos,
     }
@@ -126,6 +139,7 @@ export function DocentesPage() {
       docentes={docentesQuery.data ?? []}
       isLoading={docentesQuery.isLoading}
       materias={materiasQuery.data ?? []}
+      carreras={carrerasQuery.data ?? []}
       convocatorias={convocatoriasQuery.data ?? []}
       grupos={gruposQuery.data ?? []}
       buscar={buscarInput}

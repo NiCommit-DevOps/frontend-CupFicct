@@ -3,10 +3,17 @@ import { Button, Input, Modal, Select } from '@/shared/ui'
 import { defaultPassword } from '@/lib/defaultPassword'
 import type { Sexo } from '@/modules/acceso/types'
 import type { Materia, Docente, DocenteGrupo } from '@/modules/academico/types'
+import type { Carrera } from '@/modules/examenes/types'
 import type { Convocatoria } from '@/modules/administrativo/types'
 
 /** Tope de grupos por docente (regla del negocio: de 1 a 4 grupos). */
 const MAX_GRUPOS = 4
+
+/** Una fila del repetidor: una carrera con las materias (áreas) que dicta en ella. */
+export interface AsignacionForm {
+  id_carrera: number
+  materias: number[]
+}
 
 export interface DocenteFormValues {
   // Datos del usuario base (solo en alta).
@@ -24,7 +31,8 @@ export interface DocenteFormValues {
   especialidad: string
   tiene_maestria: boolean
   tiene_diplomado: boolean
-  materias: number[]
+  // Contratación: por cada carrera, las materias (áreas) que dicta.
+  asignaciones: AsignacionForm[]
   convocatorias: number[]
   grupos: number[]
 }
@@ -43,7 +51,7 @@ const VACIO: DocenteFormValues = {
   especialidad: '',
   tiene_maestria: false,
   tiene_diplomado: false,
-  materias: [],
+  asignaciones: [],
   convocatorias: [],
   grupos: [],
 }
@@ -55,12 +63,13 @@ interface Props {
   loading: boolean
   error: string | null
   materias: Materia[]
+  carreras: Carrera[]
   convocatorias: Convocatoria[]
   grupos: DocenteGrupo[]
   docente: Docente | null
 }
 
-export function DocenteFormModal({ open, onClose, onSubmit, loading, error, materias, convocatorias, grupos, docente }: Props) {
+export function DocenteFormModal({ open, onClose, onSubmit, loading, error, materias, carreras, convocatorias, grupos, docente }: Props) {
   const editando = docente != null
   const [values, setValues] = useState<DocenteFormValues>(VACIO)
 
@@ -82,7 +91,11 @@ export function DocenteFormModal({ open, onClose, onSubmit, loading, error, mate
             especialidad: docente.especialidad ?? '',
             tiene_maestria: docente.tiene_maestria,
             tiene_diplomado: docente.tiene_diplomado,
-            materias: docente.materias?.map((m) => m.id_materia) ?? [],
+            asignaciones:
+              docente.asignaciones?.map((a) => ({
+                id_carrera: a.id_carrera,
+                materias: a.materias.map((m) => m.id_materia),
+              })) ?? [],
             convocatorias: docente.convocatorias?.map((c) => c.id_convocatoria) ?? [],
             grupos: docente.grupos?.map((g) => g.id_grupo) ?? [],
           }
@@ -97,10 +110,32 @@ export function DocenteFormModal({ open, onClose, onSubmit, loading, error, mate
   const set = <K extends keyof DocenteFormValues>(key: K, value: DocenteFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }))
 
-  const toggleMateria = (id: number) =>
+  // --- Repetidor de asignaciones (carrera + materias/áreas) ---
+  const agregarAsignacion = () =>
+    setValues((prev) => ({ ...prev, asignaciones: [...prev.asignaciones, { id_carrera: 0, materias: [] }] }))
+
+  const quitarAsignacion = (index: number) =>
+    setValues((prev) => ({ ...prev, asignaciones: prev.asignaciones.filter((_, i) => i !== index) }))
+
+  const setAsignacionCarrera = (index: number, idCarrera: number) =>
     setValues((prev) => ({
       ...prev,
-      materias: prev.materias.includes(id) ? prev.materias.filter((m) => m !== id) : [...prev.materias, id],
+      asignaciones: prev.asignaciones.map((a, i) => (i === index ? { ...a, id_carrera: idCarrera } : a)),
+    }))
+
+  const toggleAsignacionMateria = (index: number, idMateria: number) =>
+    setValues((prev) => ({
+      ...prev,
+      asignaciones: prev.asignaciones.map((a, i) =>
+        i === index
+          ? {
+              ...a,
+              materias: a.materias.includes(idMateria)
+                ? a.materias.filter((m) => m !== idMateria)
+                : [...a.materias, idMateria],
+            }
+          : a,
+      ),
     }))
 
   const toggleConvocatoria = (id: number) =>
@@ -235,30 +270,97 @@ export function DocenteFormModal({ open, onClose, onSubmit, loading, error, mate
           </label>
         </fieldset>
 
-        {/* Materias que dicta el docente (de 1 a muchas) */}
-        <fieldset className="flex flex-col gap-2">
+        {/* Carreras y áreas: por cada carrera, las materias (áreas) que dicta. */}
+        <fieldset className="flex flex-col gap-3">
           <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Materias que dicta
+            Carreras y áreas que dicta
           </legend>
-          {materias.length === 0 ? (
-            <p className="text-sm text-slate-400">No hay materias registradas.</p>
+
+          {carreras.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              No hay carreras registradas. Crea carreras (CU08) para poder asignarlas.
+            </p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {materias.map((m) => (
-                <label
-                  key={m.id_materia}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200/60 px-3 py-2 text-sm text-slate-600 dark:border-slate-700/40 dark:text-slate-300"
+            <>
+              {values.asignaciones.length === 0 && (
+                <p className="text-sm text-slate-400">
+                  Aún no agregaste carreras. Usa "Agregar carrera" para asignar al docente.
+                </p>
+              )}
+
+              {values.asignaciones.map((asig, index) => {
+                // Carreras disponibles para esta fila: las no usadas en otras filas.
+                const usadasEnOtras = values.asignaciones
+                  .filter((_, i) => i !== index)
+                  .map((a) => a.id_carrera)
+                const carrerasDisponibles = carreras.filter(
+                  (c) => c.id_carrera === asig.id_carrera || !usadasEnOtras.includes(c.id_carrera),
+                )
+
+                return (
+                  <div
+                    key={index}
+                    className="flex flex-col gap-3 rounded-xl border border-slate-200/60 p-3 dark:border-slate-700/40"
+                  >
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <Select
+                          label="Carrera"
+                          value={asig.id_carrera ? String(asig.id_carrera) : ''}
+                          onChange={(e) => setAsignacionCarrera(index, Number(e.target.value))}
+                        >
+                          <option value="">— Seleccionar carrera —</option>
+                          {carrerasDisponibles.map((c) => (
+                            <option key={c.id_carrera} value={c.id_carrera}>
+                              {c.nombre}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <Button variant="danger" size="sm" type="button" onClick={() => quitarAsignacion(index)}>
+                        Quitar
+                      </Button>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-slate-400">Áreas (materias) que dicta</span>
+                      {materias.length === 0 ? (
+                        <p className="text-sm text-slate-400">No hay materias registradas.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {materias.map((m) => (
+                            <label
+                              key={m.id_materia}
+                              className="flex items-center gap-2 rounded-xl border border-slate-200/60 px-3 py-2 text-sm text-slate-600 dark:border-slate-700/40 dark:text-slate-300"
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                                checked={asig.materias.includes(m.id_materia)}
+                                onChange={() => toggleAsignacionMateria(index, m.id_materia)}
+                              />
+                              {m.nombre}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+
+              <div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={agregarAsignacion}
+                  disabled={values.asignaciones.length >= carreras.length}
                 >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                    checked={values.materias.includes(m.id_materia)}
-                    onChange={() => toggleMateria(m.id_materia)}
-                  />
-                  {m.nombre}
-                </label>
-              ))}
-            </div>
+                  + Agregar carrera
+                </Button>
+              </div>
+            </>
           )}
         </fieldset>
 
